@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transcription</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .upload-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            margin: 10px;
+        }
+        #status {
+            margin-top: 20px;
+            color: #666;
+        }
+        .progress-container {
+            width: 100%;
+            max-width: 300px;
+            margin: 10px auto;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .processing-animation {
+            width: 100%;
+            height: 20px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #4CAF50 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: processing 1.5s infinite linear;
+        }
+        @keyframes processing {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+        .progress-text {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #666;
+        }
+        #transcriptionResult {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f8f8;
+            border-radius: 5px;
+            text-align: left;
+            white-space: pre-wrap;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Audio Transcription</h2>
+        <input type="file" id="fileInput" style="display: none;" accept="audio/*">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Select Audio File</button>
+        <button class="upload-btn" id="uploadBtn" onclick="processAudio()" style="display: none;">Transcribe Audio</button>
+        
+        <!-- Upload Progress -->
+        <div class="progress-container" id="uploadProgress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="uploadProgressFill"></div>
+            </div>
+            <div class="progress-text" id="uploadProgressText">0%</div>
+        </div>
+        
+        <!-- Processing Progress -->
+        <div class="progress-container" id="processingProgress">
+            <div class="progress-bar">
+                <div class="processing-animation"></div>
+            </div>
+            <div class="progress-text">Processing audio...</div>
+        </div>
+        
+        <div id="status"></div>
+        <div id="transcriptionResult"></div>
+    </div>
+
+    <script>
+        const DEEPGRAM_KEY = '8cf77b5e01365444aacb96be492fcdf75d562952';
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                document.getElementById('uploadBtn').style.display = 'inline-block';
+                document.getElementById('status').textContent = 'File selected: ' + e.target.files[0].name;
+                document.getElementById('transcriptionResult').style.display = 'none';
+            }
+        });
+
+        async function processAudio() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select an audio file first!');
+                return;
+            }
+
+            // Show upload progress
+            const uploadProgress = document.getElementById('uploadProgress');
+            const processingProgress = document.getElementById('processingProgress');
+            uploadProgress.style.display = 'block';
+            document.getElementById('status').textContent = 'Uploading audio file...';
+
+            try {
+                // Read file
+                const reader = new FileReader();
+                reader.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        const percentComplete = (event.loaded / event.total) * 100;
+                        document.getElementById('uploadProgressFill').style.width = percentComplete + '%';
+                        document.getElementById('uploadProgressText').textContent = Math.round(percentComplete) + '%';
+                    }
+                };
+
+                reader.onload = async () => {
+                    // Hide upload progress, show processing
+                    uploadProgress.style.display = 'none';
+                    processingProgress.style.display = 'block';
+                    document.getElementById('status').textContent = 'Processing audio...';
+
+                    try {
+                        const response = await fetch('https://api.deepgram.com/v1/listen', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Token ${DEEPGRAM_KEY}`,
+                                'Content-Type': file.type
+                            },
+                            body: reader.result
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        const transcript = data.results.channels[0].alternatives[0].transcript;
+
+                        // Hide processing progress
+                        processingProgress.style.display = 'none';
+                        
+                        // Show results
+                        const resultDiv = document.getElementById('transcriptionResult');
+                        resultDiv.style.display = 'block';
+                        resultDiv.textContent = transcript;
+                        document.getElementById('status').textContent = 'Transcription complete!';
+
+                    } catch (error) {
+                        processingProgress.style.display = 'none';
+                        document.getElementById('status').textContent = 'Error processing audio: ' + error.message;
+                    }
+                };
+
+                reader.onerror = () => {
+                    uploadProgress.style.display = 'none';
+                    document.getElementById('status').textContent = 'Error reading file!';
+                };
+
+                // Start reading the file
+                reader.readAsArrayBuffer(file);
+
+            } catch (error) {
+                uploadProgress.style.display = 'none';
+                document.getElementById('status').textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
