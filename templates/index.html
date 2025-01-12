@@ -1,0 +1,243 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<!-- Previous head section remains the same -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hiiiiii</title>
+    <style>
+        /* Previous styles remain the same */
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .upload-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            margin: 10px;
+        }
+        .download-btn {
+            background-color: #008CBA;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            margin: 10px;
+            display: none;
+        }
+        #status {
+            margin-top: 20px;
+            color: #666;
+        }
+        .progress-container {
+            width: 100%;
+            max-width: 300px;
+            margin: 10px auto;
+            display: none;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        .processing-animation {
+            width: 100%;
+            height: 20px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #4CAF50 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: processing 1.5s infinite linear;
+        }
+        @keyframes processing {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+        .progress-text {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>File Upload and Download</h2>
+        <input type="file" id="fileInput" style="display: none;">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Select File</button>
+        <button class="upload-btn" id="uploadBtn" onclick="uploadFile()" style="display: none;">Upload File</button>
+        <button class="download-btn" id="downloadBtn" onclick="downloadFile()">Download Transcription</button>
+        
+        <!-- Upload Progress -->
+        <div class="progress-container" id="uploadProgress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="uploadProgressFill"></div>
+            </div>
+            <div class="progress-text" id="uploadProgressText">0%</div>
+        </div>
+        
+        <!-- Processing Progress -->
+        <div class="progress-container" id="processingProgress">
+            <div class="progress-bar">
+                <div class="processing-animation"></div>
+            </div>
+            <div class="progress-text">Processing file...</div>
+        </div>
+        
+        <!-- Download Progress -->
+        <div class="progress-container" id="downloadProgress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="downloadProgressFill"></div>
+            </div>
+            <div class="progress-text" id="downloadProgressText">0%</div>
+        </div>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        let processedFilename = null;
+        
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                document.getElementById('uploadBtn').style.display = 'inline-block';
+                document.getElementById('status').textContent = 'File selected: ' + e.target.files[0].name;
+            }
+        });
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select a file first!');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Show upload progress bar
+            const uploadProgress = document.getElementById('uploadProgress');
+            const uploadProgressFill = document.getElementById('uploadProgressFill');
+            const uploadProgressText = document.getElementById('uploadProgressText');
+            uploadProgress.style.display = 'block';
+            
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        uploadProgressFill.style.width = percentComplete + '%';
+                        uploadProgressText.textContent = Math.round(percentComplete) + '%';
+                    }
+                };
+                
+                xhr.upload.onload = function() {
+                    // Hide upload progress and show processing status
+                    uploadProgress.style.display = 'none';
+                    document.getElementById('processingProgress').style.display = 'block';
+                    document.getElementById('status').textContent = 'Processing file...';
+                };
+                
+                xhr.onload = async function() {
+                    if (xhr.status === 200) {
+                        const data = JSON.parse(xhr.responseText);
+                        processedFilename = data.processed_file;
+                        
+                        // Hide processing progress and show download button
+                        document.getElementById('processingProgress').style.display = 'none';
+                        document.getElementById('downloadBtn').style.display = 'inline-block';
+                        document.getElementById('status').textContent = 'File transcribed successfully!';
+                    } else {
+                        document.getElementById('status').textContent = 'Error: ' + xhr.responseText;
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    document.getElementById('status').textContent = 'Error uploading file';
+                    document.getElementById('processingProgress').style.display = 'none';
+                };
+                
+                xhr.open('POST', '/upload', true);
+                xhr.send(formData);
+                
+                document.getElementById('status').textContent = 'Uploading...';
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error uploading file: ' + error;
+                document.getElementById('processingProgress').style.display = 'none';
+            }
+        }
+
+        async function downloadFile() {
+            if (!processedFilename) return;
+            
+            const downloadProgress = document.getElementById('downloadProgress');
+            const downloadProgressFill = document.getElementById('downloadProgressFill');
+            const downloadProgressText = document.getElementById('downloadProgressText');
+            downloadProgress.style.display = 'block';
+            
+            try {
+                const response = await fetch(`/download/${processedFilename}`);
+                const reader = response.body.getReader();
+                const contentLength = +response.headers.get('Content-Length');
+                
+                let receivedLength = 0;
+                const chunks = [];
+                
+                while(true) {
+                    const {done, value} = await reader.read();
+                    
+                    if (done) {
+                        break;
+                    }
+                    
+                    chunks.push(value);
+                    receivedLength += value.length;
+                    
+                    const percentComplete = (receivedLength / contentLength) * 100;
+                    downloadProgressFill.style.width = percentComplete + '%';
+                    downloadProgressText.textContent = Math.round(percentComplete) + '%';
+                }
+                
+                const blob = new Blob(chunks);
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = processedFilename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                setTimeout(() => {
+                    downloadProgress.style.display = 'none';
+                    downloadProgressFill.style.width = '0%';
+                    downloadProgressText.textContent = '0%';
+                }, 1000);
+                
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error downloading file: ' + error;
+            }
+        }
+    </script>
+</body>
+</html>
