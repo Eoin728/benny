@@ -25,6 +25,14 @@
             cursor: pointer;
             margin: 10px;
         }
+        .language-btn {
+            background-color: #4e55ba;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+            margin: 10px;
+        }
         #status {
             margin-top: 20px;
             color: #666;
@@ -81,7 +89,10 @@
         <input type="file" id="fileInput" style="display: none;" accept="audio/*">
         <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Select Audio File</button>
         <button class="upload-btn" id="uploadBtn" onclick="processAudio()" style="display: none;">Transcribe Audio</button>
-        
+        <select class="language-btn" name="cars" id="cars" >
+            <option value="it">Italian</option>
+            <option value="en">English</option>
+        </select>
         <!-- Upload Progress -->
         <div class="progress-container" id="uploadProgress">
             <div class="progress-bar">
@@ -104,7 +115,22 @@
 
     <script>
         const DEEPGRAM_KEY = '8cf77b5e01365444aacb96be492fcdf75d562952';
-        
+
+        // Define the switchLang function globally
+        // function switchLang(language) {
+        //     if (language === 'italian') {
+        //         // Your code to switch to Italian
+        //         console.log("Switching to Italian");
+        //     } else if (language === 'english') {
+        //         // Your code to switch to English
+        //         console.log("Switching to English");
+        //     }
+        //     else{
+        //         console.log("hello")
+        //     }
+        // }
+
+        // <select class="language-btn" name="cars" id="cars" onchange="switchLang(this.value)">
         document.getElementById('fileInput').addEventListener('change', function(e) {
             if (e.target.files.length > 0) {
                 document.getElementById('uploadBtn').style.display = 'inline-block';
@@ -145,7 +171,9 @@
                     document.getElementById('status').textContent = 'Processing audio...';
 
                     try {
-                        const response = await fetch('https://api.deepgram.com/v1/listen', {
+                        const lang = document.getElementById('cars').value;
+                        url = 'https://api.deepgram.com/v1/listen?model=nova-2&language='+lang 
+                        const response = await fetch(url, {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Token ${DEEPGRAM_KEY}`,
